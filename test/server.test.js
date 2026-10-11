@@ -38,7 +38,7 @@ test('relays a Discord message to multiple real WebSocket clients', { timeout: 5
     const received = clients.map(ws => once(ws, 'message'));
     const handler = createMessageHandler({ config: {}, broadcast: relay.broadcast });
     await handler({
-        guildId: '1', channelId: '2', channel: { name: 'livechat' }, content: 'Bonjour !',
+        guildId: '1', channelId: '2', channel: { name: 'livechat' }, content: '!livechat Bonjour !',
         author: { username: 'Alice', displayAvatarURL: () => 'https://example.com/a.png' }, attachments: new Map(),
     });
     for (const [data] of await Promise.all(received)) {

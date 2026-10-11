@@ -46,8 +46,9 @@ function toPayload(message, config) {
         : message.channel?.name === 'livechat';
     if (!matchesChannel) return null;
 
-    // Retain compatibility with people still using the old command in #livechat.
-    let text = (message.content || '').replace(/^!livechat(?:\s+|$)/, '').trim();
+    const content = message.content || '';
+    const hasCommand = /^!livechat(?:\s+|$)/.test(content);
+    let text = content.replace(/^!livechat(?:\s+|$)/, '').trim();
     let url = null;
     for (const attachment of message.attachments?.values() || []) {
         const media = /^(image|video)\//i.test(attachment.contentType || '')
@@ -65,7 +66,8 @@ function toPayload(message, config) {
             text = `${text.slice(0, link.start)}${text.slice(link.end)}`.trim();
         }
     }
-    if (!url && !text) return null;
+    // Media is automatic; plain text requires an explicit command.
+    if (!url && (!hasCommand || !text)) return null;
     return {
         type: 'play_media', url, text,
         author: message.member?.displayName || message.author.globalName || message.author.username,

@@ -6,11 +6,11 @@ function message(overrides = {}) {
     return {
         guildId: '1', channelId: '2', channel: { name: 'livechat' },
         author: { bot: false, username: 'Alice', displayAvatarURL: () => 'https://example.com/avatar.png' },
-        content: 'Bonjour !', attachments: new Map(), ...overrides,
+        content: '!livechat Bonjour !', attachments: new Map(), ...overrides,
     };
 }
 
-test('forwards text without a command using the overlay wire format', () => {
+test('forwards commanded text using the overlay wire format', () => {
     assert.deepEqual(toPayload(message(), {}), {
         type: 'play_media', url: null, text: 'Bonjour !', author: 'Alice', avatar: 'https://example.com/avatar.png',
     });
@@ -38,9 +38,12 @@ test('extracts links from sentences, newlines, angle brackets and Markdown', () 
     assert.equal(toPayload(message({ content: 'https://example.com/a_(b)' }), {}).url, 'https://example.com/a_(b)');
 });
 
-test('legacy command is optional and only stripped at a word boundary', () => {
+test('plain text requires the exact command prefix and nonempty content', () => {
     assert.equal(toPayload(message({ content: '!livechat Bonjour' }), {}).text, 'Bonjour');
-    assert.equal(toPayload(message({ content: '!livechatting' }), {}).text, '!livechatting');
+    assert.equal(toPayload(message({ content: '!livechat\nBonjour' }), {}).text, 'Bonjour');
+    for (const content of ['Bonjour', '!livechatting', 'Bonjour !livechat', '!livechat', '!livechat   ']) {
+        assert.equal(toPayload(message({ content }), {}), null, content);
+    }
 });
 
 test('selects a media attachment after an unsupported file and retains the caption', () => {
@@ -63,10 +66,20 @@ test('supports attachment filename fallback and falls back to links after unsupp
 
 test('does not pass unsafe URLs as media, preserving text messages', () => {
     for (const content of ['javascript:alert(1)', 'file:///private', 'https://user:pass@example.com/a']) {
-        const result = toPayload(message({ content }), {});
+        assert.equal(toPayload(message({ content }), {}), null);
+        const result = toPayload(message({ content: `!livechat ${content}` }), {});
         assert.equal(result.url, null);
         assert.equal(result.text, content);
     }
+});
+
+test('ordinary text and unsupported attachments never reach broadcast', async () => {
+    const handler = createMessageHandler({ config: {}, broadcast: () => assert.fail('must not broadcast') });
+    await handler(message({ content: 'Conversation ordinaire' }));
+    await handler(message({
+        content: 'Un document',
+        attachments: new Map([['1', { url: 'https://example.com/a.pdf', contentType: 'application/pdf' }]]),
+    }));
 });
 
 test('ignores empty messages and uses server display names', () => {
